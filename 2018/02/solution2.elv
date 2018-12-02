@@ -16,6 +16,7 @@ each [x]{
     if (eq $diff 1) {
       echo $x "<->" $y
       echo Common: $common
+      exit
     }
   } $input
 } $input
