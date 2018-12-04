@@ -8,7 +8,8 @@ startmin = 0
 
 # Read data and build time table
 cat input.txt | sort | each [l]{
-  m = (re:find '\[.*:(\d\d)\]' $l)[groups][1][text]
+  # Add with 0 to convert to a number (remove trailing zero)
+  m = (+ (re:find '\[.*:(\d\d)\]' $l)[groups][1][text] 0)
   if (re:match 'begins shift' $l) {
     guard = (re:find 'Guard #(\d+) ' $l)[groups][1][text]
     if (not (has-key $timetable $guard)) {
@@ -39,7 +40,7 @@ maxmins = 0
 range 0 60 | each [min]{
   if (> $timetable[$maxguard][$min] $maxmins) { maxmin = $min; maxmins = $timetable[$maxguard][$min] }
 }
-echo "Most-asleep minute: "$maxmin
+echo "Most-asleep minute: "$maxmin" ("$maxmins" times)"
 echo "Result:" (* $maxmin $maxguard)
 
 # Strategy #2
@@ -48,8 +49,8 @@ maxtotalmin = 0
 maxtotalmins = 0
 keys $timetable | each [guard]{
   range 0 60 | each [min]{
-    if (> $timetable[$maxguard][$min] $maxtotalmins) {
-      maxtotalmins = $timetable[$maxguard][$min]
+    if (> $timetable[$guard][$min] $maxtotalmins) {
+      maxtotalmins = $timetable[$guard][$min]
       maxtotalmin = $min
       maxtotalguard = $guard
     }
