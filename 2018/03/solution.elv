@@ -20,7 +20,7 @@ map = [(repeat (* $maxx $maxy) 0)]
 
 # Function to set values for a whole patch
 fn mark [c]{
-  pprint $c
+  #pprint $c
   x y w h = $c[x y w h]
   range $w | each [i]{
     range $h | each [j]{
