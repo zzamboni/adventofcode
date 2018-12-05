@@ -34,7 +34,7 @@ echo "Length of initial reduction: "(count $new)
 # Part 2
 shortest = (util:min &with=[v]{ count $v[1] } (
     each [p]{
-      echo "  Testing improvement by removing "(joins / $p) > /dev/tty
+      echo "  Testing improvement by removing "(joins / $p) >&2
       put [$p (fully-react (replaces $p[0] '' (replaces $p[1] '' $new)))]
   } $pairs))
 
