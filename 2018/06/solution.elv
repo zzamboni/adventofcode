@@ -115,13 +115,26 @@ closest-count = [&]
 
 range $minx (+ $maxx 1) | each [x]{
   range $miny (+ $maxy 1) | each [y]{
-    print [$x $y] ""
-    closest = (closest-point [$x $y])
+    if (== (% (* $x $y) 100) 0) { print [$x $y] "" }
+    min-d = 1000
+    min-p = []
+    each [p]{
+      d = (mannhattan-distance [$x $y] $p)
+      if (< $d $min-d) {
+        min-d = $d
+        min-p = [$p]
+      } elif (== $d $min-d) {
+        min-p = [$@min-p $p]
+      }
+    } $points
     #echo "  - closest point:" $closest
-    if (not (has-key $closest-count $closest)) {
-      closest-count[$closest] = 1
-    } else {
-      closest-count[$closest] = (+ $closest-count[$closest] 1)
+    if (eq 1 (count $min-p)) {
+      closest = $min-p[0]
+      if (not (has-key $closest-count $closest)) {
+        closest-count[$closest] = 1
+      } else {
+        closest-count[$closest] = (+ $closest-count[$closest] 1)
+      }
     }
   }
 }
