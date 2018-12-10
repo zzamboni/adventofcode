@@ -1,9 +1,9 @@
 #lang racket
 (require racket/set)
 
-(define pairs (map (lambda (l) (cdr (regexp-match #rx"Step (.) must be finished before step (.) can begin" l))) (file->lines "input.txt")))
-(define (alphabet-hash) (make-hash (build-list 26 (lambda (x) (cons (string (integer->char (+ x (char->integer #\A)))) 0)))))
 (define workers 5)
+(define (read-input) (map (lambda (l) (cdr (regexp-match #rx"Step (.) must be finished before step (.) can begin" l))) (file->lines "input.txt")))
+(define (alphabet-hash) (make-hash (build-list 26 (lambda (x) (cons (string (integer->char (+ x (char->integer #\A)))) 0)))))
 
 (define matrix (alphabet-hash))
 (define letters (sort (hash-keys matrix) string<?))
@@ -28,7 +28,7 @@
       (printf " ~a " (get-coord row col)))
     (printf "~n")))
 
-(define (init-matrix)
+(define (init-matrix pairs)
   (for ([l letters])
     (hash-set! matrix l (alphabet-hash))
     (set-coord l l (letter-value l)))
@@ -81,4 +81,4 @@
                      i)))])
     (printf "~a ~a ~a" (string-join steps "") (string-length (string-join steps "")) (add1 nsteps))))
 
-(init-matrix)
+(init-matrix (read-input))
