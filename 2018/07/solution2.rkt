@@ -61,24 +61,23 @@
   (take-at-most (sort (filter (lambda (l) (can-be-done l done-steps)) letters) string<?) n))
 
 (define (list-subtract a b)
-  (set->list (set-subtract (list->set a) (list->set b))))
+  (filter (lambda (m) (not (member m b))) a))
 
 (define (solve-puzzle)
-  (let-values ([(steps prog nsteps)
+  (let-values ([(steps _ nsteps)
                 (for/fold ([done '()]
-                           [progress '()]
+                           [in-progress '()]
                            [nsteps 0])
-                          ([i (in-naturals)]
-                           #:break (or (and (empty? (doable-steps workers done)) (empty? progress))))
-                  (let* ([next-steps (sort (list-subtract (doable-steps workers done) progress) string<?)]
-                         [in-progress (take-at-most (append progress next-steps) workers)]
-                         [finished (advance-steps in-progress)])
-                    (printf "i=~a done=~a progress=~a next-steps=~a in-progress=~a finished=~a~n" i done progress next-steps in-progress finished)
-                    ;(print-matrix)
+                          ([i (in-naturals 1)]
+                           #:break (and (empty? (doable-steps workers done)) (empty? in-progress)))
+                  (let* ([next-steps (sort (list-subtract (doable-steps workers done) in-progress) string<?)]
+                         [now-doing (take-at-most (append in-progress next-steps) workers)]
+                         [finished (advance-steps now-doing)])
+                    (printf "i=~a done=~a progress=~a next-steps=~a in-progress=~a finished=~a~n" i done in-progress next-steps now-doing finished)
                     (values 
                      (append done finished)
-                     (list-subtract in-progress finished)
+                     (list-subtract now-doing finished)
                      i)))])
-    (printf "~a ~a ~a" (string-join steps "") (string-length (string-join steps "")) (add1 nsteps))))
+    (printf "~a ~a ~a" (string-join steps "") (string-length (string-join steps "")) nsteps)))
 
 (init-matrix (read-input))
