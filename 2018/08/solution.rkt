@@ -29,3 +29,13 @@
       (traverse-apply subs func new))))
 
 (define (first-result) (traverse-apply (parse-tree tree-numbers) (lambda (v t) (apply + v (fourth t))) 0))
+
+(define (node-value t)
+  (match-let ([(list a b c d) t])
+    (if (zero? a)
+        (apply + d)
+        (apply + (for/list ([ind d])
+                   (if (<= 1 ind (length c)) (node-value (list-ref c (sub1 ind))) 0))))))
+
+(define (second-result)
+  (node-value (parse-tree tree-numbers)))
