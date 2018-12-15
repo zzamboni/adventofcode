@@ -1,8 +1,17 @@
 #lang racket
 (require racket/match)
 
+(define (new-ring n-players last-marble)
+  (make-hash (list (cons 'marbles (make-vector (add1 last-marble) 0))
+                   (cons 'current 0)
+                   (cons 'len 1)
+                   (cons 'scores (make-vector n-players 0))
+                   ;(cons 'score-traces (make-vector n-players '()))
+                   ;(cons 'dropped-marbles (make-vector n-players '()))
+                   )))
+
 (define (ring-pos ring delta)
-  (modulo (+ (hash-ref ring 'current) delta) (length (hash-ref ring 'marbles))))
+  (modulo (+ (hash-ref ring 'current) delta) (hash-ref ring 'len)))
                             
 (define (ring-current ring)
   (hash-ref ring 'current))
@@ -18,19 +27,19 @@
 
 ; Add v in the position after pos
 (define (ring-add! ring pos v)
-  (hash-update! ring 'marbles
-                (lambda (m)
-                  (append (take m (add1 pos))
-                          (list v)
-                          (drop m (add1 pos))))))
+  (let ([marbles (hash-ref ring 'marbles)]
+        [len (hash-ref ring 'len)])
+    (vector-copy! marbles (+ pos 2) marbles (+ pos 1) len)
+    (vector-set! marbles (+ pos 1) v)
+    (hash-set! ring 'len (add1 len))))
 
 ; Drop (and return) the marble at position pos
 (define (ring-drop! ring pos)
-  (let ([dropped (list-ref (ring-marbles ring) pos)])
-    (hash-update! ring 'marbles
-                  (lambda (m)
-                    (append (take m pos)
-                            (drop m (add1 pos)))))
+  (let* ([marbles (hash-ref ring 'marbles)]
+         [dropped (vector-ref marbles pos)]
+         [len (hash-ref ring 'len)])
+    (vector-copy! marbles pos marbles (+ pos 1) len)
+    (hash-set! ring 'len (sub1 len))
     dropped))
 
 (define (ring-print ring)
@@ -57,11 +66,7 @@
         (ring-set-current! ring (add1 newpos)))))
 
 (define (game n-players last-marble [trace-player -1])
-  (let ([ring (make-hash (list (cons 'marbles '(0))
-                               (cons 'current 0)
-                               (cons 'scores (make-vector n-players 0))
-                               (cons 'score-traces (make-vector n-players '()))
-                               (cons 'dropped-marbles (make-vector n-players '()))))])
+  (let ([ring (new-ring n-players last-marble)])
     (for ([marble (in-range 1 (add1 last-marble))]
           [i (in-naturals)])
       (let ([player (modulo i n-players)])
@@ -72,5 +77,8 @@
 ;    (printf "Dropped marbles:~n~a~n" (string-join (map (lambda (v) (format "~a" v)) (vector->list (hash-ref ring 'dropped-marbles))) "\n"))
     (printf "Max score for ~a players and ~a marbles: ~a~n" n-players last-marble (apply max (vector->list (ring-scores ring))))))
 
-(require profile)
-(profile-thunk (lambda () (game 416 71617)))
+;(require profile)
+;(profile-thunk (lambda () (game 416 71617)))
+
+(time (game 416 71617))
+(time (game 416 7161700))
