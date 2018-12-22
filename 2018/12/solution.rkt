@@ -1,4 +1,5 @@
 #lang racket
+(require racket/format)
 
 (module+ test
   (require rackunit))
@@ -31,14 +32,16 @@
                 998430483121465337193355320388))
 
 (define (read-input file)
-  (define rules (make-vector 32 #f))
-  (for ([line (file->lines file)])
-    (let ([m (regexp-match #px"(.....) => (.)" line)])
+  (for/fold ([rules (make-vector 32 #f)]
+             [initial-state ""])
+            ([line (file->lines file)])
+    (let ([m (regexp-match #px"(.....) => (.)" line)]
+          [n (regexp-match #px"initial state: (.*)" line)])
       (when m
         (let ([index (rule-string->number (second m))]
               [value (string=? (third m) "#")])
-          (vector-set! rules index value)))))
-  rules)
+          (vector-set! rules index value)))
+      (if n (values rules (second n)) (values rules initial-state)))))
 
 ; str must be a 5-digit binary number, returns the new value (#t/#f) of the middle bit
 (define (evolve-bit str rules)
@@ -54,8 +57,19 @@
     (let* ([tmpstr (string-join (list "00" res "00") "")]
            [array-res (for/list ([i (range (- (string-length tmpstr) 4))])
                         (evolve-bit (substring tmpstr i (+ i 5)) rules))])
-      (printf "~a: ~a~n" step (bools->rule array-res))
+      ;(printf "~a: ~a~n" step (bools->rule array-res))
       (bools->binary array-res))))
 
-;(define rules (read-input "test-input.txt"))
-;(define binstr (string-join (list "00000000000" (rule-string->binary "#..#.#..##......###...###") "00000000000") ""))
+;(define-values [rules input] (read-input "test-input.txt"))
+;(define binstr (string-join (list "00000000000" (rule-string->binary input) "00000000000") ""))
+
+(define (solve [file "input.txt"] #:steps [steps 20])
+  (let-values ([(rules input) (read-input file)])
+    (let* ([input-l (string-length input)]
+           [padded-input (rule-string->binary (~a input #:width (* input-l 3) #:pad-string "." #:align 'center))]
+           [result (evolve-string padded-input rules steps)]
+           [result-list (string->list result)])
+      (for/sum ([c result-list]
+                [n (in-naturals)]
+                #:when (eq? c #\1))
+        (- n input-l)))))
