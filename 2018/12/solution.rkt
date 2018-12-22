@@ -51,14 +51,16 @@
     res))
 
 ; str must be a binary number, advances all the bits
-(define (evolve-string str rules [steps 1])
-  (for/fold ([res str])
+(define (evolve-string str rules input-length [steps 1])
+  (for/fold ([res str] [value 0])
             ([step (range steps)])
     (let* ([tmpstr (string-join (list "00" res "00") "")]
            [array-res (for/list ([i (range (- (string-length tmpstr) 4))])
-                        (evolve-bit (substring tmpstr i (+ i 5)) rules))])
-      ;(printf "~a: ~a~n" step (bools->rule array-res))
-      (bools->binary array-res))))
+                        (evolve-bit (substring tmpstr i (+ i 5)) rules))]
+           [new-value (for/sum ([c array-res] [n (in-naturals)] #:when c) (- n (* 2 input-length)))]
+           [binary-res (bools->binary array-res)])
+      (printf "~a: ~a (~a): ~a~n" step new-value (- new-value value) (bools->rule array-res))
+      (values binary-res new-value))))
 
 ;(define-values [rules input] (read-input "test-input.txt"))
 ;(define binstr (string-join (list "00000000000" (rule-string->binary input) "00000000000") ""))
@@ -66,10 +68,10 @@
 (define (solve [file "input.txt"] #:steps [steps 20])
   (let-values ([(rules input) (read-input file)])
     (let* ([input-l (string-length input)]
-           [padded-input (rule-string->binary (~a input #:width (* input-l 3) #:pad-string "." #:align 'center))]
-           [result (evolve-string padded-input rules steps)]
-           [result-list (string->list result)])
-      (for/sum ([c result-list]
-                [n (in-naturals)]
-                #:when (eq? c #\1))
-        (- n input-l)))))
+           [padded-input (rule-string->binary (~a input #:width (* input-l 5) #:pad-string "." #:align 'center))])
+      (let-values ([(result value) (evolve-string padded-input rules input-l steps)])
+        value))))
+
+; After step 160, every step adds 33 to the count, so we don't have to compute all the way by hand.
+(define (solve2 [steps 50000000000])
+  (+ (solve #:steps 160) (* (- steps 160) 33)))
