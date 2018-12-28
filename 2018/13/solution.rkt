@@ -6,8 +6,14 @@
 (define (sort-carts cl)
   (sort cl <= #:key first))
 
+(define (remove-dead-carts carts)
+  (filter-not last carts))
+
+(define (crashed-carts? c)
+  (check-duplicates c #:key first))
+
 (define (crashed? g)
-  (check-duplicates (game-carts g) #:key first))
+  (crashed-carts? (game-carts g)))
 
 (define (all-crashes g)
   (let-values ([(crashes _)
@@ -15,7 +21,7 @@
                            [seen '()])
                           ([c (game-carts g)])
                   (if (member (first c) seen)
-                      (values (cons (first c) crashes) (cons (first c) seen))
+                      (values (cons (first c) crashes) seen)
                       (values crashes (cons (first c) seen))))])
     crashes))
 
@@ -28,16 +34,17 @@
   (let ([carts (game-carts g)]
         [w (game-width g)]
         [h (game-height g)]
-        [crashed-pos (crashed? g)])
+        [crashed-pos (all-crashes g)])
     (for ([c (game-map g)]
           [i (in-naturals)])
       (when (zero? (modulo i w)) (printf "~n"))
       (let ([cart-here (findf (lambda (c) (= (first c) i)) carts)])
         (if cart-here
-            (if crashed-pos
+            (if (member (first cart-here) crashed-pos)
                 (color 'black 'red "X")
                 (color 'black 'green (format "~a" (second cart-here))))
-            (display (format "~a" c)))))))
+            (display (format "~a" c)))))
+    (display (format "~n"))))
 
 (define (x-y pos w)
   (let-values ([(y x) (quotient/remainder pos w)])
@@ -55,8 +62,8 @@
                              [i (in-naturals)])
                     (let ([coord (x-y i width)])
                       (cond
-                        [(member c '(#\^ #\v)) (values (cons (list i c 0 coord) carts) (cons #\| new-chars))]
-                        [(member c '(#\< #\>)) (values (cons (list i c 0 coord) carts) (cons #\- new-chars))]
+                        [(member c '(#\^ #\v)) (values (cons (list i c 0 coord #f) carts) (cons #\| new-chars))]
+                        [(member c '(#\< #\>)) (values (cons (list i c 0 coord #f) carts) (cons #\- new-chars))]
                         [else                  (values carts                           (cons c   new-chars))])))])
       (game (list->vector (reverse map)) (sort-carts carts) width height))))
 
@@ -85,33 +92,41 @@
                        [(eq? segment #\/) #\^]
                        [(eq? segment #\\) #\v])])))
 
+; Return the new value for cart after a move
+(define (move cart game)
+  (let* ([w (game-width game)]
+         [pos (first cart)]
+         [symb (second cart)]
+         [turn (third cart)]
+         [dead (last cart)]
+         [next-pos (+ pos (second (assoc symb (list '(#\> 1) '(#\< -1) (list #\^ (- w)) (list #\v w)))))]
+         [next-coord (x-y next-pos w)]
+         [next-segment (vector-ref (game-map game) next-pos)])
+    (cond
+      [(eq? next-segment #\|) (list next-pos symb turn next-coord dead)]
+      [(eq? next-segment #\-) (list next-pos symb turn next-coord dead)]
+      [(eq? next-segment #\/) (list next-pos (handle-turn cart next-segment) turn next-coord dead)]
+      [(eq? next-segment #\\) (list next-pos (handle-turn cart next-segment) turn next-coord dead)]
+      [(eq? next-segment #\+) (list next-pos (handle-intersection cart) (modulo (add1 turn) 3) next-coord dead)])))
+
+(define (mark-dead-carts carts)
+  (for/fold ([new-carts '()])
+            ([cart carts])
+    (if (> (length (filter (lambda (c) (and (not (last c)) (not (last cart)) (= (first c) (first cart)))) carts)) 1)
+        (cons (list (first cart) (second cart) (third cart) (fourth cart) #t) new-carts)
+        (cons cart new-carts))))
+
 (define (tick g)
   (let* ([map (game-map g)]
          [w (game-width g)]
          [h (game-height g)]
-         [new-carts
-          (for/fold ([new-carts '()])
-                    ([cart (sort-carts (game-carts g))])
-            (let* ([pos (first cart)]
-                   [symb (second cart)]
-                   [turn (third cart)]
-                   [next-pos
-                    (cond
-                      [(eq? symb #\>) (add1 pos)]
-                      [(eq? symb #\<) (sub1 pos)]
-                      [(eq? symb #\^) (- pos w)]
-                      [(eq? symb #\v) (+ pos w)])]
-                   [next-coord (x-y next-pos w)]
-                   [next-segment (vector-ref map next-pos)])
-              (cons
-               (cond
-                 [(eq? next-segment #\|) (list next-pos symb turn next-coord)]
-                 [(eq? next-segment #\-) (list next-pos symb turn next-coord)]
-                 [(eq? next-segment #\/) (list next-pos (handle-turn cart next-segment) turn next-coord)]
-                 [(eq? next-segment #\\) (list next-pos (handle-turn cart next-segment) turn next-coord)]
-                 [(eq? next-segment #\+) (list next-pos (handle-intersection cart) (modulo (add1 turn) 3) next-coord)])
-               new-carts)))])
-    (game map (sort-carts new-carts) w h)))
+         [old-carts (sort-carts (game-carts g))])
+    (let ([new-carts (for/fold ([carts (list->vector old-carts)])
+                               ([cart-no (range (length old-carts))])
+                       (let ([cart (vector-ref carts cart-no)])
+                         (vector-set! carts cart-no (move cart g))
+                         (list->vector (mark-dead-carts (vector->list carts)))))])
+      (game map (sort-carts (vector->list new-carts)) w h))))
 
 (define (solve1 [file "input.txt"])
   (let-values ([(last-game crash-pos)
@@ -130,16 +145,13 @@
                    ([i (in-naturals)]
                     #:break (= (length (game-carts g)) 1))
            (let* ([new-game (tick g)]
-                  [crashes (all-crashes new-game)])
+                  [new-carts (mark-dead-carts (game-carts new-game))]
+                  [filtered-carts (sort-carts (remove-dead-carts new-carts))])
              ;(display-game new-game)
-             (when crashes
-               (printf "#~a: Carts: ~a~n    Crashes: ~a~n" i (game-carts new-game) crashes)
-               (set-game-carts! new-game (filter-not (lambda (c) (member (first c) crashes)) (game-carts new-game))))
+             (set-game-carts! new-game filtered-carts)
              new-game))])
     (let* ([final-game last-game]
            [pos (fourth (first (game-carts final-game)))])
       (display-game final-game)
       (printf "Carts: ~a~n" (game-carts final-game))
       (printf "Last cart: ~a,~a~n" (first pos) (second pos)))))
-
-
