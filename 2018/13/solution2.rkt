@@ -63,28 +63,20 @@
 ; Return the new direction of a cart at an intersection
 (define (handle-intersection cart)
   (let ([dir (cart-dir cart)]
-        [turn (cart-turn cart)])
-    (cond
-      [(eq? dir #\^) (vector-ref #(#\< #\^ #\>) turn)]
-      [(eq? dir #\v) (vector-ref #(#\> #\v #\<) turn)]
-      [(eq? dir #\<) (vector-ref #(#\v #\< #\^) turn)]
-      [(eq? dir #\>) (vector-ref #(#\^ #\> #\v) turn)])))
+        [turn (cart-turn cart)]
+        [turns (hash #\^ #(#\< #\^ #\>)
+                     #\v #(#\> #\v #\<)
+                     #\< #(#\v #\< #\^)
+                     #\> #(#\^ #\> #\v))])
+    (vector-ref (hash-ref turns dir) turn)))
 
 (define (handle-turn cart segment)
-  (let ([dir (cart-dir cart)])
-    (cond
-      [(eq? dir #\^) (cond
-                       [(eq? segment #\/) #\>]
-                       [(eq? segment #\\) #\<])]
-      [(eq? dir #\v) (cond
-                       [(eq? segment #\/) #\<]
-                       [(eq? segment #\\) #\>])]
-      [(eq? dir #\<) (cond
-                       [(eq? segment #\/) #\v]
-                       [(eq? segment #\\) #\^])]
-      [(eq? dir #\>) (cond
-                       [(eq? segment #\/) #\^]
-                       [(eq? segment #\\) #\v])])))
+  (let ([dir (cart-dir cart)]
+        [turns (hash '(#\^ #\/) #\> '(#\^ #\\) #\<
+                     '(#\v #\/) #\< '(#\v #\\) #\>
+                     '(#\< #\/) #\v '(#\< #\\) #\^
+                     '(#\> #\/) #\^ '(#\> #\\) #\v)])
+    (hash-ref turns (list dir segment))))
 
 ; Return the new value for cart after a move
 (define (move this-cart game)
@@ -98,21 +90,19 @@
          [next-pos (+ pos (hash-ref increments symb))]
          [next-segment (vector-ref (game-map game) next-pos)])
     (cond
-      [(eq? next-segment #\|) (cart next-pos symb turn dead)]
-      [(eq? next-segment #\-) (cart next-pos symb turn dead)]
-      [(eq? next-segment #\/) (cart next-pos (handle-turn this-cart next-segment) turn dead)]
-      [(eq? next-segment #\\) (cart next-pos (handle-turn this-cart next-segment) turn dead)]
-      [(eq? next-segment #\+) (cart next-pos (handle-intersection this-cart) (modulo (add1 turn) 3) dead)])))
+      [(eq?    next-segment #\+)        (cart next-pos (handle-intersection this-cart) (modulo (add1 turn) 3) dead)]
+      [(member next-segment '(#\/ #\\)) (cart next-pos (handle-turn this-cart next-segment) turn dead)]
+      [else                             (cart next-pos symb turn dead)])))
 
 (define (move-cart game carts ncarts i)
-;  (printf "Step #~a:~n" i)
+  ;  (printf "Step #~a:~n" i)
   (let* ([cart (vector-ref carts (modulo i ncarts))]
          [new-cart (move cart game)]
          [new-pos (cart-pos new-cart)])
-;    (printf "Cart: ~a   New cart: ~a~n" cart new-cart)
+    ;    (printf "Cart: ~a   New cart: ~a~n" cart new-cart)
     (vector-set! carts (modulo i ncarts) new-cart)
     (let ([carts-here (carts-here (live-carts carts) new-pos)])
-;      (display-game game)
+      ;      (display-game game)
       (when (> (vector-length carts-here) 1)
         (printf "Crash at ~a~n" (x-y (cart-pos (vector-first carts-here)) (game-width game)))
         (for ([c carts])
@@ -122,13 +112,13 @@
 (define (solve game)
   (let* ([carts (game-carts game)]
          [ncarts (vector-length carts)])
-;    (display-game game)
+    ;    (display-game game)
     (for ([i (in-naturals)]
           #:when (cart-alive (vector-ref carts (modulo i ncarts))))
+      #:final (= (vector-length (live-carts carts)) 1)
       (if (= (vector-length (live-carts carts)) 1)
-          (begin
-            (printf "Last cart: ~a (~a)~n" (live-carts carts) (x-y (cart-pos (vector-first (live-carts carts))) (game-width game)))
-            (exit))
+          (printf "Last cart: ~a (~a)~n" (live-carts carts)
+                    (x-y (cart-pos (vector-first (live-carts carts))) (game-width game)))
           (move-cart game carts ncarts i)))))
 
 (define (play [file "input.txt"])
